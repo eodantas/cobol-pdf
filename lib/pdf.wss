@@ -1,0 +1,244 @@
+           01 PDF-OC-FILE.  *> OPEN / CREATE
+              02 PDF-FILE           PIC X(50) VALUE SPACES.
+              02 PDF-ACCESS-MODE    PIC X COMP-X.
+              02 PDF-DENY-MODE      PIC X COMP-X.
+              02 PDF-DEVICE         PIC X COMP-X VALUE 0.
+              02 PDF-FILE-HANDLE    PIC X(04).
+
+           01 PDF-HANDLE            PIC X(04).
+           01 REF-HANDLE            PIC X(04).
+
+           01 PDF-RW-FILE. *>READ / WRITE
+              02 PDF-FILE-OFFSET    PIC X(08) COMP-X.
+              02 PDF-BYTE-COUNT     PIC X(04) COMP-X.
+              02 PDF-FLAGS          PIC X     COMP-X VALUE 0.
+              02 PDF-BUFFER         PIC X(2000).
+
+           01 REF-RW-FILE. *>READ / WRITE
+              02 REF-FILE-OFFSET    PIC X(08) COMP-X.
+              02 REF-BYTE-COUNT     PIC X(04) COMP-X VALUE 11.
+              02 REF-FLAGS          PIC X     COMP-X VALUE 0.
+              02 REF-BUFFER         PIC X(11).
+              02 REF-TAM            PIC X(08) COMP-X.
+
+           01 PDF-VAR.
+              02 PDF-PI          PIC 9(01)V9(13)  VALUE 3.1415926535898. *> Define o numero PI
+              02 PDF-NUM-PAG      PIC 9(05)        VALUE 0.      *>Store current page
+              02 PDF-K            PIC 9(01)V9(10)  VALUE 0.      *>Constant mm
+              02 PDF-DATA-SIS     PIC 9(06)        VALUE 0.      *>Date of system
+              02 PDF-HORA-SIS     PIC 9(08)        VALUE 0.      *>Time of system
+              02 PDF-DTHR         PIC X(14)        VALUE SPACES. *>Data reversed + time
+              02 PDF-AX1          PIC 9(08)V9(10)  VALUE 0.      *>Var of general use
+              02 PDF-AX2          PIC 9(08)        VALUE 0.      *>Var of general use
+              02 PDF-AX3          PIC 9(10)        VALUE 0.      *>Var of general use
+              02 PDF-AX4          PIC 9(08)        VALUE 0.      *>Var of general use
+              02 PDF-AX5          PIC 9(08)        VALUE 0.      *>Var of general use
+              02 PDF-AX6          PIC 9(08)        VALUE 0.      *>Var of general use
+              02 PDF-IDX          PIC 9(08)        VALUE 0.      *>Buffer indice
+              02 PDF-TAM-PG       PIC 9(06)        VALUE 0.      *>Store total bytes of page
+              02 PDF-TAM-STREAM   PIC X(06)        VALUE SPACES. *>Mask to total bytes of page
+              02 PDF-POS-TAM      PIC X(08) COMP-X.              *>Position where the total bytes will be recorded
+              02 PDF-OFFSET-TOTAL PIC X(08) COMP-X VALUE 0.      *>Store last byte position
+              02 PDF-X            PIC 9(03)V9(02)  VALUE 0.      *>Current column mm
+              02 PDF-GX           PIC 9(03)V9(02)  VALUE 0.      *>Current column mm (backup)
+              02 PDF-Y            PIC 9(03)V9(02)  VALUE 0.      *>Current line mm
+              02 PDF-GY           PIC 9(03)V9(02)  VALUE 0.      *>Current line mm (backup)
+              02 PDF-POS          PIC S9(03)V9(02) VALUE 0.      *>Store position in points
+              02 PDF-POSZ         PIC -999.99.                    *>Mask store position
+              02 PDF-STR          PIC X(800)       VALUE SPACES. *>Buffer
+              02 PDF-SW           PIC 9(10)V9(03)  VALUE 0.      *>Length string in mm
+              02 PDF-SL           PIC 9(03)        VALUE 0.      *>Number of rows occupied by a string in a cell
+              02 PDF-WS           PIC 9(03)V9(02)  VALUE 0.      *>Space between words
+              02 PDF-WS-FLAG      PIC 9(01)        VALUE 0.      *>Space between words 1 ACTIVE AND 0 DESABLE
+              02 PDF-ST           PIC 9(03)        VALUE 0.      *>Characteres in string
+              02 PDF-FW           PIC 9(03) OCCURS 256 VALUE 0.  *>Array with the current font's character size
+              02 PDF-FONT-UP      PIC S9(04)       VALUE -100.   *>Used for underline font
+              02 PDF-FONT-UT      PIC 9(03)        VALUE 50.     *>Used for underline font
+              02 PDF-NUM-OBJ      PIC 9(08)        VALUE 5.      *>Number of objects
+              02 PDF-CON-OBJ      PIC 9(08)        VALUE 0.      *>Current page object number
+              02 PDF-POS-OBJ      PIC 9(10) OCCURS 5 VALUE 0.    *>Store object start
+                                                                 *>Index 5 will be used for any object greater than 4
+              02 PDF-ROOT         PIC X(20)        VALUE SPACES.
+              02 PDF-INFO         PIC X(20)        VALUE SPACES.
+              02 PDF-COLOR-FLAG   PIC 9(01)        VALUE 0.
+              02 PDF-NS           PIC 9(03)        VALUE 0.      *>Number of spaces in string
+              02 PDF-ORD          PIC 9(03)        VALUE 0.      *>Numerical value of the character
+              02 PDF-BUF-TXT      PIC X(800)       VALUE SPACES. *>Cell text
+
+           01 PDF-PAGINA.
+              02 PDF-PAG-SET.
+                 03 PDF-PAG-TIPO   PIC X(02)       VALUE "A4".   *>Page type
+                 03 FILLER         PIC X(01)       VALUE SPACES.
+                 03 PDF-PAG-W      PIC 9(04)V9(02) VALUE 595.28. *>Page width in points
+                 03 FILLER         PIC X(01)       VALUE SPACES.
+                 03 PDF-PAG-H      PIC 9(04)V9(02) VALUE 841.89. *>Page height in points
+                 03 FILLER         PIC X(01)       VALUE SPACES.
+                 03 PDF-PAG-ORI    PIC X(01)       VALUE "P".    *>Page orientation
+                 03 FILLER         PIC X(01)       VALUE SPACES.
+                 03 PDF-PAG-LM     PIC 9(02)V9(02) VALUE 10.00.  *>Left margin in mm
+                 03 FILLER         PIC X(01)       VALUE SPACES.
+                 03 PDF-PAG-RM     PIC 9(02)V9(02) VALUE 10.00.  *>Right margin in mm
+                 03 FILLER         PIC X(01)       VALUE SPACES.
+                 03 PDF-PAG-TM     PIC 9(02)V9(02) VALUE 10.00.  *>Top margin in mm
+                 03 FILLER         PIC X(01)       VALUE SPACES.
+                 03 PDF-PAG-BM     PIC 9(02)V9(02) VALUE 10.00.  *>Bottom margin in mm
+              02 PDF-PAG REDEFINES PDF-PAG-SET  PIC X(38).
+              02 PDF-PAG-IM     PIC 9(01)       VALUE 1.      *>Inner margin of the cell in mm
+              02 PDF-PW         PIC 9(03)V9(02) VALUE 0.      *>Page width without margins in mm
+              02 PDF-PH         PIC 9(03)V9(02) VALUE 0.      *>Page height without margins in mm
+
+           01 PDF-FONTES.
+              02 PDF-FONTES-SET.
+                 03 PDF-FONT-SZPT PIC 9(02)V9(02) VALUE 10.
+                 03 FILLER        PIC X(01)       VALUE SPACES.
+                 03 PDF-FONT-ST   PIC X(02)       VALUE "N".
+                 03 FILLER        PIC X(01)       VALUE SPACES.
+                 03 PDF-FONT-NAME PIC X(10)       VALUE "ARIAL".
+              02 PDF-FONT REDEFINES PDF-FONTES-SET PIC X(18).
+              02 PDF-FONT-F       PIC X(02)       VALUE "F1".
+              02 PDF-FONT-SZ      PIC 9(02)V9(02) VALUE 0.
+              02 PDF-FONT-SZZ     PIC ZZ.ZZ.                   *>Mask for PDF-FONT-SZ
+              02 PDF-FONT-UNDER   PIC X(01)       VALUE SPACE.
+
+           01 PDF-TAB-FONT.
+              02 PDF-FONT-N     PIC X(30) OCCURS 12 VALUE SPACES.
+              02 PDF-FONT-FLAG  PIC 9(01) OCCURS 12 VALUE 0.
+              02 PDF-FONT-OBJ   PIC 9(08) OCCURS 12 VALUE 0.
+
+           01 PDF-FILL-COLOR.
+              02 PDF-FILL-SET.
+                 03 PDF-FILL-R     PIC 9(03)       VALUE 189.    *>Color red
+                 03 FILLER         PIC X(01)       VALUE SPACE.
+                 03 PDF-FILL-G     PIC 9(03)       VALUE 189.    *>Color green
+                 03 FILLER         PIC X(01)       VALUE SPACE.
+                 03 PDF-FILL-B     PIC 9(03)       VALUE 189.    *>Color blue
+              02 PDF-FILL-COR REDEFINES PDF-FILL-SET PIC X(11).
+              02 PDF-FILL-POSZ     PIC 999.999.
+              02 PDF-FCOLOR        PIC X(30)       VALUE "0.000 g".
+
+           01 PDF-TEXT-COLOR.
+              02 PDF-TEXT-SET.
+                 03 PDF-TEXT-R     PIC 9(03)       VALUE 0.      *>Color red
+                 03 FILLER         PIC X(01)       VALUE SPACE.
+                 03 PDF-TEXT-G     PIC 9(03)       VALUE 0.      *>Color green
+                 03 FILLER         PIC X(01)       VALUE SPACE.
+                 03 PDF-TEXT-B     PIC 9(03)       VALUE 0.      *>Color blue
+              02 PDF-TEXT-COR REDEFINES PDF-TEXT-SET PIC X(11).
+              02 PDF-TEXT-POSZ     PIC 999.999.
+              02 PDF-TCOLOR        PIC X(30)       VALUE "0.000 g".
+
+           01 PDF-DRAW-COLOR.
+              02 PDF-DRAW-SET.
+                 03 PDF-DRAW-R     PIC 9(03)       VALUE 0.      *>Color red
+                 03 FILLER         PIC X(01)       VALUE SPACE.
+                 03 PDF-DRAW-G     PIC 9(03)       VALUE 0.      *>Color green
+                 03 FILLER         PIC X(01)       VALUE SPACE.
+                 03 PDF-DRAW-B     PIC 9(03)       VALUE 0.      *>Color blue
+              02 PDF-DRAW-COR REDEFINES PDF-DRAW-SET PIC X(11).
+              02 PDF-DRAW-POSZ     PIC 999.999.
+              02 PDF-DCOLOR        PIC X(30)       VALUE "0.000 G".
+
+           01 PDF-CELULA.
+              02 PDF-SET-CELULA.
+                 03 PDF-CELL-W     PIC 9(03)V9(02) VALUE 0.      *>cell width in mm
+                 03 FILLER         PIC X(01)       VALUE SPACE.
+                 03 PDF-CELL-H     PIC 9(03)V9(02) VALUE 0.      *>cell height in mm
+                 03 FILLER         PIC X(01)       VALUE SPACE.
+                 03 PDF-CELL-BORD  PIC X(04)       VALUE SPACES. *>Edge definition (0, 1, combination of LTRB)
+                 03 FILLER         PIC X(01)       VALUE SPACE.
+                 03 PDF-CELL-LN    PIC 9(01)       VALUE 0.      *>Line control: 0 same line, 1 advance line
+                 03 FILLER         PIC X(01)       VALUE SPACE.
+                 03 PDF-CELL-ALIN  PIC X(01)       VALUE SPACE.  *>Alignment inside the cell (L, C, R)
+                 03 FILLER         PIC X(01)       VALUE SPACE.
+                 03 PDF-CELL-FILL  PIC 9(01)       VALUE 0.      *>Cell filling: 0 no, 1 yes
+                 03 FILLER         PIC X(01)       VALUE SPACE.
+                 03 PDF-CELL-TXT   PIC X(800)      VALUE SPACES. *>Cell text
+              02 PDF-CELL REDEFINES PDF-SET-CELULA PIC X(823).
+              02 PDF-CELL-DX       PIC 9(03)V9(05) VALUE 0.      *>Offset of X when alignment C ou R
+              02 PDF-CELL-GH       PIC 9(03)V9(02) VALUE 0.      *>Place to copy PDF-CELL-H
+
+           01 PDF-GCELL            PIC X(823)      VALUE SPACES. *>Save cell parameters
+
+           01 PDF-MULTI-CELULA.
+              02 PDF-MULTI-CEL.
+                 03 PDF-MULT-W     PIC 9(03)V9(02) VALUE 0.      *>Cell width in mm
+                 03 FILLER         PIC X(01)       VALUE SPACE.
+                 03 PDF-MULT-H     PIC 9(03)V9(02) VALUE 0.      *>Cell height in mm
+                 03 FILLER         PIC X(01)       VALUE SPACE.
+                 03 PDF-MULT-BORD  PIC X(04)       VALUE SPACES. *>Edge definition (0, 1, combination of LTRB)
+                 03 FILLER         PIC X(01)       VALUE SPACE.
+                 03 PDF-MULT-ALIN  PIC X(01)       VALUE SPACE.  *>Alignment inside the cell (L, C, R)
+                 03 FILLER         PIC X(01)       VALUE SPACE.
+                 03 PDF-MULT-FILL  PIC 9(01)       VALUE 0.      *>Cell filling: 0 no, 1 yes
+                 03 FILLER         PIC X(01)       VALUE SPACE.
+                 03 PDF-MULT-TXT   PIC X(800)      VALUE SPACES. *>Cell text
+              02 PDF-MULT REDEFINES PDF-MULTI-CEL PIC X(821).
+              02 PDF-MULT-TC       PIC 9(07)       VALUE 0.      *>Total of characters in PDF-MULT-TXT
+              02 PDF-MULT-SWMAX    PIC 9(06)V9(03) VALUE 0.      *>Maximum string size
+              02 PDF-MULT-SWATU    PIC 9(06)V9(03) VALUE 0.      *>Current string size
+              02 PDF-MULT-IDX      PIC 9(03)       VALUE 0.      *>Position in string
+              02 PDF-MULT-IDX1     PIC 9(03)       VALUE 0.      *>Position in string
+              02 PDF-MULT-IDX2     PIC 9(03)       VALUE 0.      *>Position in string
+              02 PDF-MULT-Q        PIC 9(03)       VALUE 0.      *>Store start of substrings
+              02 PDF-MULT-QTD      PIC 9(03)       VALUE 0.      *>Store number of characters of substring
+              02 PDF-MULT-FLAG-B   PIC 9(01)       VALUE 0.      *>Controls bottom edge drawing
+              02 PDF-MULT-PSP      PIC 9(03)       VALUE 0.      *>Position of the last space before the break
+              02 PDF-MULT-CQ       PIC X(01)       VALUE "|".    *>Forced break mark
+
+           01 PDF-ROTACIONA.
+              02 PDF-ROTACIONA-SET.
+                 03 PDF-ROT-X   PIC S9(03)V9(02) VALUE 0.        *>Horizontal position in mm
+                 03 FILLER      PIC  X(01)       VALUE SPACES.
+                 03 PDF-ROT-Y   PIC S9(03)V9(02) VALUE 0.        *>Vertical position in mm
+                 03 FILLER      PIC  X(01)       VALUE SPACES.
+                 03 PDF-ROT-ANG PIC S9(03)       VALUE 0.        *>Angle
+                 03 FILLER      PIC  X(01)       VALUE SPACES.
+                 03 PDF-ROT-TXT PIC  X(100)      VALUE SPACES.   *>Text
+              02 PDF-ROT REDEFINES PDF-ROTACIONA-SET PIC X(116).
+              02 PDF-ROT-COS    PIC S9(01)V9(05) VALUE 0.
+              02 PDF-ROT-SIN    PIC S9(01)V9(05) VALUE 0.
+              02 PDF-ROT-POS    PIC -9.99999.
+              02 PDF-ROT-POSXY  PIC -999.99.
+
+           01 PDF-RECTANG.
+              02 PDF-RECT-SET.
+                 03 PDF-RECT-X      PIC S9(03)V9(02) VALUE 0.        *>horizontal position in mm
+                 03 FILLER          PIC  X(01)       VALUE SPACES.
+                 03 PDF-RECT-Y      PIC S9(03)V9(02) VALUE 0.        *>Vertical position in mm
+                 03 FILLER          PIC  X(01)       VALUE SPACES.
+                 03 PDF-RECT-W      PIC S9(03)V9(02) VALUE 0.
+                 03 FILLER          PIC  X(01)       VALUE SPACES.   *>width in mm
+                 03 PDF-RECT-H      PIC S9(03)V9(02) VALUE 0.
+                 03 FILLER          PIC  X(01)       VALUE SPACES.   *>Height in mm
+                 03 PDF-RECT-STYLE  PIC  X(01)       VALUE SPACES.   *>Estyle (f, B, S)
+              02 PDF-RECTANGLE REDEFINES PDF-RECT-SET PIC X(25).
+              02 PDF-RECT-POSXY     PIC -999.99.
+
+           01 PDF-CODBAR-EAN13.
+              02 PDF-BARRA-EAN13-SET.
+                 03 PDF-VALORES.
+                    04 PDF-TIPO-CODES OCCURS 3.
+                       05 PDF-CODES  PIC X(07) OCCURS 10.
+                 03 PDF-CODES-SET REDEFINES PDF-VALORES PIC X(210).
+                 03 PDF-PARES.
+                    04 PDF-PARES1 OCCURS 10.
+                       05 PDF-PARITIES PIC 9(01) OCCURS 6.
+                 03 PDF-PARES-SET REDEFINES PDF-PARES PIC X(60).
+              02 PDF-EAN13.
+                 03 PDF-EAN13-X  PIC S9(03)V9(02) VALUE 0.
+                 03 FILLER       PIC X(01) VALUE SPACES.
+                 03 PDF-EAN13-Y  PIC S9(03)V9(02) VALUE 0.
+                 03 FILLER       PIC X(01) VALUE SPACES.
+                 03 PDF-EAN13-W  PIC S9(03)V9(02) VALUE 0.
+                 03 FILLER       PIC X(01) VALUE SPACES.
+                 03 PDF-EAN13-H  PIC S9(03)V9(02) VALUE 0.
+                 03 FILLER       PIC X(01) VALUE SPACES.
+                 03 PDF-BARCODE  PIC X(13) VALUE SPACES.
+              02 PDF-EAN13-SET REDEFINES PDF-EAN13 PIC X(37).
+              02 PDF-CODIGO   PIC X(95) VALUE SPACES.
+              02 PDF-WI       PIC 9(03) VALUE 0.
+              02 PDF-WJ       PIC 9(03) VALUE 0.
+              02 PDF-WP       PIC X(06) VALUE SPACES.
+              02 PDF-WT       PIC 9(02) VALUE 0.
+              02 PDF-W1       PIC 9(01) VALUE 0.
+              02 PDF-W2       PIC 9(02) VALUE 0.

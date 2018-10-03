@@ -1,0 +1,1096 @@
+       PDF-BAR-EAN13.
+           PERFORM PDF-LOAD-EAN13
+           MOVE 1     TO PDF-WI
+           STRING "101" DELIMITED SIZE INTO PDF-CODIGO POINTER PDF-WI
+           COMPUTE PDF-WT = FUNCTION NUMVAL(PDF-BARCODE(1:1)) + 1
+           MOVE PDF-PARES1(PDF-WT) TO PDF-WP
+           PERFORM VARYING PDF-WJ FROM 2 BY 1 UNTIL PDF-WJ > 7
+              MOVE PDF-WP((PDF-WJ - 1):1) TO PDF-W1(1:1)
+              COMPUTE PDF-W2 = FUNCTION NUMVAL(PDF-BARCODE(PDF-WJ:1))
+                               + 1
+              STRING
+                 PDF-CODES(PDF-W1, PDF-W2)
+              DELIMITED SIZE INTO PDF-CODIGO POINTER PDF-WI
+           END-PERFORM
+           STRING
+              '01010'
+           DELIMITED SIZE INTO PDF-CODIGO POINTER PDF-WI
+           PERFORM VARYING PDF-WJ FROM 8 BY 1 UNTIL PDF-WJ > 13
+              COMPUTE PDF-W2 = FUNCTION NUMVAL(PDF-BARCODE(PDF-WJ:1))
+                               + 1
+              STRING
+                 PDF-CODES(3, PDF-W2)
+              DELIMITED SIZE INTO PDF-CODIGO POINTER PDF-WI
+           END-PERFORM
+           STRING
+              '101'
+           DELIMITED SIZE INTO PDF-CODIGO POINTER PDF-WI
+           PERFORM VARYING PDF-WT FROM 1 BY 1
+                   UNTIL PDF-WT > FUNCTION LENGTH(PDF-CODIGO)
+              IF PDF-CODIGO(PDF-WT:1) = '1'
+                 COMPUTE PDF-RECT-X = PDF-EAN13-X +
+                                      ((PDF-WT - 1) * PDF-EAN13-W)
+                 MOVE PDF-EAN13-Y TO PDF-RECT-Y
+                 MOVE PDF-EAN13-W TO PDF-RECT-W
+                 MOVE PDF-EAN13-H TO PDF-RECT-H
+                 MOVE "f"         TO PDF-RECT-STYLE
+                 PERFORM PDF-RECT
+                 PERFORM PDF-GRAVA-BUFFER
+              END-IF
+           END-PERFORM.
+
+       PDF-ESCAPE-TXT.
+           MOVE SPACES TO PDF-BUF-TXT
+           PERFORM VARYING PDF-AX4 FROM 800 BY -1 UNTIL PDF-AX4 < 1 OR
+                   PDF-CELL-TXT(PDF-AX4:1) NOT = SPACE END-PERFORM
+           MOVE 1 TO PDF-AX3
+           PERFORM VARYING PDF-AX2 FROM 1 BY 1 UNTIL PDF-AX2 > PDF-AX4
+              IF PDF-CELL-TXT(PDF-AX2:1) = ")" OR "("
+                 MOVE "\" TO PDF-BUF-TXT(PDF-AX3:)
+                 ADD 1 TO PDF-AX3
+              END-IF
+              MOVE PDF-CELL-TXT(PDF-AX2:1) TO PDF-BUF-TXT(PDF-AX3:)
+              ADD 1 TO PDF-AX3
+           END-PERFORM
+           MOVE PDF-BUF-TXT TO PDF-CELL-TXT.
+
+       PDF-END-DOC.
+           PERFORM PDF-GRAVA-BUFFER
+           MOVE PDF-POS-TAM TO PDF-FILE-OFFSET
+           MOVE 6           TO PDF-BYTE-COUNT
+           STRING PDF-TAM-PG DELIMITED SIZE INTO PDF-BUFFER
+           PERFORM PDF-GRAVA-ARQ
+           MOVE SPACES TO PDF-BUFFER
+           MOVE 1      TO PDF-IDX
+           STRING X"0A" "endstream" X"0A" "endobj" X"0A"
+                  DELIMITED SIZE INTO PDF-BUFFER POINTER PDF-IDX
+           COMPUTE PDF-POS-OBJ(1) = PDF-OFFSET-TOTAL + PDF-IDX - 1
+           STRING "1 0 obj" X"0A" "<</Type /Pages" X"0A" "/Kids ["
+                  DELIMITED SIZE INTO PDF-BUFFER POINTER PDF-IDX
+           PERFORM VARYING PDF-AX2 FROM 3 BY 2 UNTIL PDF-AX2 >
+                   (PDF-NUM-PAG * 2 + 1)
+              IF PDF-AX2 > 3
+                 STRING " " DELIMITED SIZE INTO PDF-BUFFER
+                        POINTER PDF-IDX
+              END-IF
+              PERFORM VARYING PDF-AX3 FROM 1 BY 1 UNTIL PDF-AX3 > 8
+                      OR PDF-AX2(PDF-AX3:1) NOT = 0 END-PERFORM
+              STRING PDF-AX2(PDF-AX3:) " 0 R" DELIMITED SIZE
+                     INTO PDF-BUFFER POINTER PDF-IDX
+              IF PDF-IDX > 1000
+                 PERFORM PDF-GRAVA-BUFFER
+              END-IF
+           END-PERFORM
+           PERFORM VARYING PDF-AX2 FROM 1 BY 1 UNTIL PDF-AX2 > 5
+                   OR PDF-NUM-PAG(PDF-AX2:1) NOT = "0" END-PERFORM
+           STRING "]" X"0A" "/Count " PDF-NUM-PAG(PDF-AX2:) X"0A" "/"
+                  "MediaBox [0 0 " DELIMITED SIZE INTO PDF-BUFFER
+                  POINTER PDF-IDX
+           MOVE PDF-PAG-W TO PDF-POSZ
+           STRING PDF-POSZ " " DELIMITED SIZE INTO PDF-BUFFER
+                  POINTER PDF-IDX
+           MOVE PDF-PAG-H TO PDF-POSZ
+           STRING PDF-POSZ "]" X"0A" ">>" X"0A" "endobj" X"0A"
+                  DELIMITED SIZE INTO PDF-BUFFER POINTER PDF-IDX
+           PERFORM VARYING PDF-AX2 FROM 1 BY 1 UNTIL PDF-AX2 > 12
+              IF PDF-FONT-FLAG(PDF-AX2) = 1
+                 PERFORM VARYING PDF-AX3 FROM 1 BY 1 UNTIL PDF-AX3 > 8
+                         OR PDF-NUM-OBJ(PDF-AX3:1) NOT = "0"
+                 END-PERFORM
+                 IF PDF-NUM-OBJ > 4
+                    COMPUTE PDF-POS-OBJ(5) = PDF-OFFSET-TOTAL +
+                                             PDF-IDX - 1
+                    STRING PDF-POS-OBJ(5) X"0A" DELIMITED SIZE
+                           INTO REF-BUFFER
+                    PERFORM PDF-GRAVA-REF
+                    ADD 11 TO REF-FILE-OFFSET
+                 ELSE
+                    COMPUTE PDF-POS-OBJ(PDF-NUM-OBJ) =
+                            PDF-OFFSET-TOTAL + PDF-IDX - 1
+                 END-IF
+                 STRING PDF-NUM-OBJ(PDF-AX3:) " 0 obj" X"0A" "<</Typ"
+                        "e /Font" X"0A" "/BaseFont /" DELIMITED SIZE
+                        INTO PDF-BUFFER POINTER PDF-IDX
+                 PERFORM VARYING PDF-AX3 FROM 30 BY -1 UNTIL
+                         PDF-AX3 < 1 OR PDF-FONT-N(PDF-AX2)(PDF-AX3:1)
+                         NOT = SPACE END-PERFORM
+                 STRING PDF-FONT-N(PDF-AX2)(1:PDF-AX3) X"0A" "/Subty"
+                        "pe /Type1" X"0A" "/Encoding /WinAnsiEncodin"
+                        "g" X"0A" ">>" X"0A" "endobj" X"0A"
+                        DELIMITED SIZE INTO PDF-BUFFER POINTER PDF-IDX
+                 MOVE PDF-NUM-OBJ TO PDF-FONT-OBJ(PDF-AX2)
+                 ADD 1 TO PDF-NUM-OBJ
+              END-IF
+           END-PERFORM
+           COMPUTE PDF-POS-OBJ(2) = PDF-OFFSET-TOTAL + PDF-IDX - 1
+           STRING "2 0 obj" X"0A" "<<" X"0A" "/ProcSet [/PDF /Text /"
+                  "ImageB /ImageC /ImageI]" X"0A" "/Font <<" X"0A"
+                  DELIMITED SIZE INTO PDF-BUFFER POINTER PDF-IDX
+           PERFORM VARYING PDF-AX2 FROM 1 BY 1 UNTIL PDF-AX2 > 12
+              IF PDF-FONT-FLAG(PDF-AX2) = 1
+                 PERFORM VARYING PDF-AX3 FROM 1 BY 1 UNTIL PDF-AX3 > 8
+                         OR PDF-AX2(PDF-AX3:1) NOT = "0"
+                 END-PERFORM
+                 STRING "/F" PDF-AX2(PDF-AX3:) " " DELIMITED SIZE
+                        INTO PDF-BUFFER POINTER PDF-IDX
+                 PERFORM VARYING PDF-AX3 FROM 1 BY 1 UNTIL PDF-AX3 > 12
+                         OR PDF-FONT-OBJ(PDF-AX2)(PDF-AX3:1) NOT = "0"
+                 END-PERFORM
+                 STRING PDF-FONT-OBJ(PDF-AX2)(PDF-AX3:) " 0 R" X"0A"
+                        DELIMITED SIZE INTO PDF-BUFFER POINTER PDF-IDX
+              END-IF
+           END-PERFORM
+           STRING ">>" X"0A" "/XObject <<" X"0A" ">>" X"0A" ">>"
+                  X"0A" "endobj" X"0A" DELIMITED SIZE
+                  INTO PDF-BUFFER POINTER PDF-IDX
+           PERFORM VARYING PDF-AX2 FROM 1 BY 1 UNTIL PDF-AX2 > 8 OR
+                   PDF-NUM-OBJ(PDF-AX2:1) NOT = "0" END-PERFORM
+
+           COMPUTE PDF-POS-OBJ(5) = PDF-OFFSET-TOTAL + PDF-IDX - 1
+           STRING PDF-POS-OBJ(5) X"0A" DELIMITED SIZE
+                  INTO REF-BUFFER
+           PERFORM PDF-GRAVA-REF
+           ADD 11 TO REF-FILE-OFFSET
+
+           STRING "/Info " PDF-NUM-OBJ(PDF-AX2:) " 0 R"
+                  DELIMITED SIZE INTO PDF-INFO
+
+           STRING PDF-NUM-OBJ(PDF-AX2:) " 0 obj" X"0A" "<<" X"0A" "/"
+                  "Producer (ZEPAMA 1.0)" X"0A" "/CreationDate (D:"
+                  PDF-DTHR ")" X"0A" ">>" X"0A" "endobj" X"0A"
+                  DELIMITED SIZE INTO PDF-BUFFER POINTER PDF-IDX
+           ADD 1 TO PDF-NUM-OBJ
+           PERFORM VARYING PDF-AX2 FROM 1 BY 1 UNTIL PDF-AX2 > 8 OR
+                   PDF-NUM-OBJ(PDF-AX2:1) NOT = "0" END-PERFORM
+
+           COMPUTE PDF-POS-OBJ(5) = PDF-OFFSET-TOTAL + PDF-IDX - 1
+           STRING PDF-POS-OBJ(5) X"0A" DELIMITED SIZE
+                  INTO REF-BUFFER
+           PERFORM PDF-GRAVA-REF
+           ADD 11 TO REF-FILE-OFFSET
+
+           STRING "/Root " PDF-NUM-OBJ(PDF-AX2:) " 0 R"
+                  DELIMITED SIZE INTO PDF-ROOT
+
+           STRING PDF-NUM-OBJ(PDF-AX2:) " 0 obj" X"0A" "<<" X"0A"
+                  "/Type /Catalog" X"0A" "/Pages 1 0 R" X"0A" "/Open"
+                  "Action [3 0 R /XYZ null null 1.00]" X"0A" ">>"
+                  X"0A" "endobj" X"0A" DELIMITED SIZE
+                  INTO PDF-BUFFER POINTER PDF-IDX
+           ADD 1 TO PDF-NUM-OBJ
+           PERFORM VARYING PDF-AX2 FROM 1 BY 1 UNTIL PDF-AX2 > 8 OR
+                   PDF-NUM-OBJ(PDF-AX2:1) NOT = "0" END-PERFORM
+
+           COMPUTE PDF-POS-OBJ(5) = PDF-OFFSET-TOTAL + PDF-IDX - 1
+
+           STRING "xref" X"0A" "0 " PDF-NUM-OBJ(PDF-AX2:) X"0A" "000"
+                  "0000000 65535 f" X"0A" DELIMITED SIZE
+                  INTO PDF-BUFFER POINTER PDF-IDX
+           PERFORM VARYING PDF-AX2 FROM 1 BY 1 UNTIL PDF-AX2 > 4
+              STRING PDF-POS-OBJ(PDF-AX2) " 00000 n" X"0A"
+                     DELIMITED SIZE INTO PDF-BUFFER POINTER PDF-IDX
+           END-PERFORM
+           COMPUTE REF-TAM = REF-FILE-OFFSET - 11
+           PERFORM VARYING PDF-AX2 FROM 0 BY 11 UNTIL
+                   PDF-AX2 > REF-TAM
+              MOVE PDF-AX2 TO REF-FILE-OFFSET
+              PERFORM PDF-LER-REF
+              STRING REF-BUFFER(1:10) " 00000 n" X"0A" DELIMITED SIZE
+                     INTO PDF-BUFFER POINTER PDF-IDX
+              IF PDF-IDX > 1500
+                 PERFORM PDF-GRAVA-BUFFER
+              END-IF
+           END-PERFORM
+           MOVE REF-HANDLE TO PDF-FILE-HANDLE
+           PERFORM PDF-FECHA-ARQ
+           PERFORM PDF-APAGA-REF
+           MOVE PDF-HANDLE TO PDF-FILE-HANDLE
+
+           PERFORM VARYING PDF-AX2 FROM 1 BY 1 UNTIL PDF-AX2 > 8 OR
+                   PDF-NUM-OBJ(PDF-AX2:1) NOT = "0" END-PERFORM
+           STRING "trailer" X"0A" "<<" X"0A" "/Size "
+                  PDF-NUM-OBJ(PDF-AX2:) X"0A" DELIMITED SIZE
+                  INTO PDF-BUFFER POINTER PDF-IDX
+           PERFORM VARYING PDF-AX2 FROM 20 BY -1 UNTIL PDF-AX2 < 1 OR
+                   PDF-ROOT(PDF-AX2:1) NOT = SPACE END-PERFORM
+           STRING PDF-ROOT(1:PDF-AX2) X"0A" DELIMITED SIZE
+                  INTO PDF-BUFFER POINTER PDF-IDX
+           PERFORM VARYING PDF-AX2 FROM 20 BY -1 UNTIL PDF-AX2 < 1 OR
+                   PDF-INFO(PDF-AX2:1) NOT = SPACE END-PERFORM
+           PERFORM VARYING PDF-AX3 FROM 1 BY 1 UNTIL PDF-AX3 > 10 OR
+                   PDF-POS-OBJ(5)(PDF-AX3:1) NOT = "0"
+           STRING PDF-INFO(1:PDF-AX2) X"0A" ">>" X"0A" "startxref"
+                  X"0A" PDF-POS-OBJ(5)(PDF-AX3:) X"0A" "%%EOF"
+                  DELIMITED SIZE INTO PDF-BUFFER POINTER PDF-IDX
+           PERFORM PDF-GRAVA-BUFFER
+           PERFORM PDF-FECHA-ARQ.
+           PERFORM PDF-INI-VARS.
+
+       PDF-DRAW-MULT.
+           IF PDF-MULT-W = 0
+              COMPUTE PDF-MULT-W = PDF-PW - PDF-X - PDF-PAG-RM
+           END-IF
+           MOVE 0 TO PDF-MULT-IDX
+           INSPECT PDF-MULT-TXT TALLYING PDF-MULT-IDX
+                   FOR ALL PDF-MULT-CQ
+           COMPUTE PDF-MULT-SWMAX = PDF-MULT-W - 2 * PDF-PAG-IM
+           IF PDF-MULT-BORD(1:1) = "1"
+              MOVE "LTRB" TO PDF-MULT-BORD
+           END-IF
+           MOVE PDF-MULT-TXT TO PDF-STR
+           PERFORM PDF-GET-STR-W
+           IF PDF-SW <= PDF-MULT-SWMAX AND PDF-MULT-IDX = 0
+              STRING PDF-MULT(1:17) "2," PDF-MULT(18:)
+                     DELIMITED SIZE INTO PDF-CELL
+              PERFORM PDF-DRAW-CELL
+              IF PDF-MULT-ALIN = 'J'
+                 PERFORM PDF-JUSTIFY
+              END-IF
+           ELSE
+              PERFORM VARYING PDF-MULT-TC FROM 800 BY -1 UNTIL
+                      PDF-MULT-TC < 1 OR
+                      PDF-MULT-TXT(PDF-MULT-TC:1) NOT = SPACE
+              END-PERFORM
+              MOVE 0 TO PDF-MULT-IDX
+              INSPECT PDF-MULT-BORD TALLYING PDF-MULT-IDX FOR ALL "T"
+              MOVE 0 TO PDF-MULT-IDX
+              INSPECT PDF-MULT-BORD TALLYING PDF-MULT-IDX FOR ALL "B"
+              IF PDF-MULT-IDX > 0
+                 MOVE 1 TO PDF-MULT-FLAG-B
+                 INSPECT PDF-MULT-BORD REPLACING ALL "B" BY " "
+              ELSE
+                 MOVE 0 TO PDF-MULT-FLAG-B
+              END-IF
+              MOVE 0 TO PDF-SW PDF-MULT-PSP
+              MOVE 1 TO PDF-MULT-Q
+              PERFORM VARYING PDF-MULT-IDX FROM 1 BY 1 UNTIL
+                      PDF-MULT-IDX > PDF-MULT-TC
+                 MOVE FUNCTION ORD(PDF-MULT-TXT(PDF-MULT-IDX:1))
+                      TO PDF-ORD
+                 ADD PDF-FW(PDF-ORD) TO PDF-SW
+                 COMPUTE PDF-MULT-SWATU ROUNDED = PDF-SW *
+                         PDF-FONT-SZ / 1000
+                 IF PDF-MULT-SWATU >= PDF-MULT-SWMAX OR
+                    PDF-MULT-TXT(PDF-MULT-IDX:1) = PDF-MULT-CQ
+                    IF PDF-MULT-TXT(PDF-MULT-IDX:1) = PDF-MULT-CQ OR
+                       PDF-MULT-PSP = 0
+                       IF PDF-MULT-PSP = 0
+                          COMPUTE PDF-MULT-PSP = PDF-MULT-IDX - 1
+                       ELSE
+                          MOVE PDF-MULT-IDX TO PDF-MULT-PSP
+                       END-IF
+                       COMPUTE PDF-MULT-QTD = PDF-MULT-IDX - PDF-MULT-Q
+                    END-IF
+                    STRING PDF-MULT(1:17) "2," PDF-MULT(18:4)
+                           DELIMITED SIZE INTO PDF-CELL
+                    MOVE PDF-MULT-TXT(PDF-MULT-Q:PDF-MULT-QTD) TO
+                         PDF-CELL-TXT
+                    MOVE PDF-CELL-TXT TO PDF-STR
+                    PERFORM PDF-GET-STR-W
+                    IF PDF-MULT-ALIN = 'J' AND
+                       PDF-MULT-TXT(PDF-MULT-IDX:1) NOT = PDF-MULT-CQ
+                       PERFORM PDF-JUSTIFY
+                    END-IF
+                    PERFORM PDF-DRAW-CELL
+                    COMPUTE PDF-MULT-Q = PDF-MULT-PSP + 1
+                    COMPUTE PDF-MULT-IDX = PDF-MULT-PSP
+                    MOVE 0 TO PDF-SW
+                    MOVE 0 TO PDF-MULT-PSP
+                    INSPECT PDF-MULT-BORD REPLACING ALL "T" BY " "
+                 ELSE
+                    IF PDF-MULT-TXT(PDF-MULT-IDX:1) = SPACE
+                       MOVE PDF-MULT-IDX TO PDF-MULT-PSP
+                       COMPUTE PDF-MULT-QTD = PDF-MULT-IDX - PDF-MULT-Q
+                    END-IF
+                 END-IF
+              END-PERFORM
+              IF PDF-SW POSITIVE
+                 IF PDF-WS-FLAG = 1
+                    MOVE 0 TO PDF-WS-FLAG
+                 END-IF
+                 IF PDF-MULT-FLAG-B POSITIVE
+                    INSPECT PDF-MULT-BORD REPLACING FIRST " " BY "B"
+                 END-IF
+                 STRING PDF-MULT(1:17) "2," PDF-MULT(18:4)
+                        DELIMITED SIZE INTO PDF-CELL
+                 MOVE PDF-MULT-TXT(PDF-MULT-Q:) TO PDF-CELL-TXT
+                 PERFORM PDF-DRAW-CELL
+              END-IF
+           END-IF
+           IF PDF-WS-FLAG = 1
+              MOVE 0 TO PDF-WS-FLAG
+           END-IF.
+
+       PDF-JUSTIFY.
+              MOVE 0 TO PDF-NS
+              PERFORM VARYING PDF-AX5 FROM 800 BY -1 UNTIL PDF-AX5 < 1
+                      OR PDF-CELL-TXT(PDF-AX5:1) NOT = SPACE
+              END-PERFORM
+              PERFORM VARYING PDF-AX6 FROM 1 BY 1 UNTIL
+                      PDF-AX6 > PDF-AX5
+                 IF PDF-CELL-TXT(PDF-AX6:1) = SPACE
+                    ADD 1 TO PDF-NS
+                 END-IF
+              END-PERFORM
+              IF PDF-NS POSITIVE
+                 COMPUTE PDF-WS ROUNDED = (PDF-MULT-SWMAX - PDF-SW)
+                                          / PDF-NS
+                 MOVE 1 TO PDF-WS-FLAG
+              ELSE
+                 MOVE 0 TO PDF-WS
+              END-IF
+              COMPUTE PDF-POS ROUNDED = PDF-WS * PDF-K
+              MOVE PDF-POS TO PDF-POSZ
+              STRING PDF-POSZ " Tw" X"0A" DELIMITED SIZE
+                     INTO PDF-BUFFER POINTER PDF-IDX
+              MOVE 'L' TO PDF-CELL-ALIN.
+
+       PDF-DRAW-CELL.
+           PERFORM PDF-ESCAPE-TXT
+           IF (PDF-Y + PDF-CELL-H) > (PDF-PH - PDF-PAG-BM)
+              PERFORM PDF-ADD-PG
+           END-IF
+           PERFORM PDF-DRAW-CELULA.
+
+       PDF-DRAW-CABEC.
+           PERFORM PDF-ESCAPE-TXT
+           PERFORM PDF-DRAW-CELULA.
+
+       PDF-DRAW-CELULA.
+           IF PDF-CELL-W = 0
+              COMPUTE PDF-CELL-W = PDF-PW - PDF-X - PDF-PAG-RM
+           END-IF
+           IF PDF-WS POSITIVE AND PDF-WS-FLAG = 0
+              MOVE 0 TO PDF-WS
+              STRING "0 Tw" X"0A" DELIMITED SIZE INTO PDF-BUFFER
+                     POINTER PDF-IDX
+           END-IF
+           IF PDF-CELL-FILL = 1 OR PDF-CELL-BORD(1:1) = 1
+              COMPUTE PDF-POS ROUNDED = PDF-X * PDF-K
+              MOVE PDF-POS TO PDF-POSZ
+              STRING PDF-POSZ " " DELIMITED SIZE
+                     INTO PDF-BUFFER POINTER PDF-IDX
+              COMPUTE PDF-POS ROUNDED =
+                      (PDF-PH - PDF-Y) * PDF-K
+              MOVE PDF-POS TO PDF-POSZ
+              STRING PDF-POSZ " " DELIMITED SIZE
+                     INTO PDF-BUFFER POINTER PDF-IDX
+              COMPUTE PDF-POS ROUNDED = PDF-CELL-W * PDF-K
+              MOVE PDF-POS TO PDF-POSZ
+              STRING PDF-POSZ " " DELIMITED SIZE
+                     INTO PDF-BUFFER POINTER PDF-IDX
+              COMPUTE PDF-POS ROUNDED = PDF-CELL-H * PDF-K * -1
+              MOVE PDF-POS TO PDF-POSZ
+              STRING PDF-POSZ " re " DELIMITED SIZE
+                     INTO PDF-BUFFER POINTER PDF-IDX
+              IF PDF-CELL-FILL = 1
+                 IF PDF-CELL-BORD(1:1) = 1
+                    STRING "B " DELIMITED SIZE INTO PDF-BUFFER
+                           POINTER PDF-IDX
+                 ELSE
+                    STRING "f " X"0A" DELIMITED SIZE INTO PDF-BUFFER
+                           POINTER PDF-IDX
+                 END-IF
+              ELSE
+                 STRING "S " X"0A" DELIMITED SIZE INTO PDF-BUFFER
+                        POINTER PDF-IDX
+              END-IF
+           END-IF
+           PERFORM VARYING PDF-AX2 FROM 1 BY 1 UNTIL PDF-AX2 > 4
+              EVALUATE PDF-CELL-BORD(PDF-AX2:1)
+                 WHEN "L"
+                    COMPUTE PDF-POS ROUNDED = PDF-X * PDF-K
+                    MOVE PDF-POS TO PDF-POSZ
+                    STRING PDF-POSZ " " DELIMITED SIZE
+                           INTO PDF-BUFFER POINTER PDF-IDX
+                    COMPUTE PDF-POS ROUNDED = (PDF-PH - PDF-Y) * PDF-K
+                    MOVE PDF-POS TO PDF-POSZ
+                    STRING PDF-POSZ " m " DELIMITED SIZE
+                           INTO PDF-BUFFER POINTER PDF-IDX
+                    COMPUTE PDF-POS ROUNDED = PDF-X * PDF-K
+                    MOVE PDF-POS TO PDF-POSZ
+                    STRING PDF-POSZ " " DELIMITED SIZE
+                           INTO PDF-BUFFER POINTER PDF-IDX
+                    COMPUTE PDF-POS ROUNDED = (PDF-PH -
+                            (PDF-Y + PDF-CELL-H)) * PDF-K
+                    MOVE PDF-POS TO PDF-POSZ
+                    STRING PDF-POSZ " l S " DELIMITED SIZE
+                           INTO PDF-BUFFER POINTER PDF-IDX
+                 WHEN "T"
+                    COMPUTE PDF-POS ROUNDED = PDF-X * PDF-K
+                    MOVE PDF-POS TO PDF-POSZ
+                    STRING PDF-POSZ " " DELIMITED SIZE
+                           INTO PDF-BUFFER POINTER PDF-IDX
+                    COMPUTE PDF-POS ROUNDED = (PDF-PH - PDF-Y) * PDF-K
+                    MOVE PDF-POS TO PDF-POSZ
+                    STRING PDF-POSZ " m " DELIMITED SIZE
+                           INTO PDF-BUFFER POINTER PDF-IDX
+                    COMPUTE PDF-POS ROUNDED = (PDF-X + PDF-CELL-W) *
+                            PDF-K
+                    MOVE PDF-POS TO PDF-POSZ
+                    STRING PDF-POSZ " " DELIMITED SIZE
+                           INTO PDF-BUFFER POINTER PDF-IDX
+                    COMPUTE PDF-POS ROUNDED = (PDF-PH - PDF-Y) * PDF-K
+                    MOVE PDF-POS TO PDF-POSZ
+                    STRING PDF-POSZ " l S " DELIMITED SIZE
+                           INTO PDF-BUFFER POINTER PDF-IDX
+                 WHEN "R"
+                    COMPUTE PDF-POS ROUNDED = (PDF-X + PDF-CELL-W) *
+                            PDF-K
+                    MOVE PDF-POS TO PDF-POSZ
+                    STRING PDF-POSZ " " DELIMITED SIZE
+                           INTO PDF-BUFFER POINTER PDF-IDX
+                    COMPUTE PDF-POS ROUNDED = (PDF-PH - PDF-Y) * PDF-K
+                    MOVE PDF-POS TO PDF-POSZ
+                    STRING PDF-POSZ " m " DELIMITED SIZE
+                           INTO PDF-BUFFER POINTER PDF-IDX
+                    COMPUTE PDF-POS ROUNDED = (PDF-X + PDF-CELL-W) *
+                            PDF-K
+                    MOVE PDF-POS TO PDF-POSZ
+                    STRING PDF-POSZ " " DELIMITED SIZE
+                           INTO PDF-BUFFER POINTER PDF-IDX
+                    COMPUTE PDF-POS ROUNDED = (PDF-PH -
+                            (PDF-Y + PDF-CELL-H)) * PDF-K
+                    MOVE PDF-POS TO PDF-POSZ
+                    STRING PDF-POSZ " l S " DELIMITED SIZE
+                           INTO PDF-BUFFER POINTER PDF-IDX
+                 WHEN "B"
+                    COMPUTE PDF-POS ROUNDED = PDF-X * PDF-K
+                    MOVE PDF-POS TO PDF-POSZ
+                    STRING PDF-POSZ " " DELIMITED SIZE
+                           INTO PDF-BUFFER POINTER PDF-IDX
+                    COMPUTE PDF-POS ROUNDED = (PDF-PH -
+                            (PDF-Y + PDF-CELL-H)) * PDF-K
+                    MOVE PDF-POS TO PDF-POSZ
+                    STRING PDF-POSZ " m " DELIMITED SIZE
+                           INTO PDF-BUFFER POINTER PDF-IDX
+                    COMPUTE PDF-POS ROUNDED = (PDF-X + PDF-CELL-W) *
+                            PDF-K
+                    MOVE PDF-POS TO PDF-POSZ
+                    STRING PDF-POSZ " " DELIMITED SIZE
+                           INTO PDF-BUFFER POINTER PDF-IDX
+                    COMPUTE PDF-POS ROUNDED = (PDF-PH -
+                            (PDF-Y + PDF-CELL-H)) * PDF-K
+                    MOVE PDF-POS TO PDF-POSZ
+                    STRING PDF-POSZ " l S " DELIMITED SIZE
+                           INTO PDF-BUFFER POINTER PDF-IDX
+              END-EVALUATE
+           END-PERFORM
+           MOVE PDF-CELL-TXT TO PDF-STR
+           PERFORM PDF-GET-STR-W
+           EVALUATE PDF-CELL-ALIN
+              WHEN "R"
+                 COMPUTE PDF-CELL-DX = PDF-CELL-W - PDF-PAG-IM -
+                         PDF-SW
+              WHEN "C"
+                 COMPUTE PDF-CELL-DX ROUNDED =
+                         (PDF-CELL-W - PDF-SW ) / 2
+              WHEN OTHER
+                 COMPUTE PDF-CELL-DX = PDF-PAG-IM
+           END-EVALUATE
+           IF PDF-COLOR-FLAG = 1
+              PERFORM VARYING PDF-AX2 FROM 30 BY -1 UNTIL PDF-AX2 < 1
+                      OR PDF-TCOLOR(PDF-AX2:1) NOT = SPACE END-PERFORM
+              STRING "q " PDF-TCOLOR(1:PDF-AX2) " " DELIMITED SIZE
+                     INTO PDF-BUFFER POINTER PDF-IDX
+           END-IF
+           COMPUTE PDF-POS ROUNDED = (PDF-X + PDF-CELL-DX) * PDF-K
+           MOVE PDF-POS TO PDF-POSZ
+           STRING "BT " PDF-POSZ " " DELIMITED SIZE INTO PDF-BUFFER
+                  POINTER PDF-IDX
+           COMPUTE PDF-POS ROUNDED = (PDF-PH - (PDF-Y +
+                   0.5 * PDF-CELL-H + 0.3 * PDF-FONT-SZ)) * PDF-K
+           MOVE PDF-POS TO PDF-POSZ
+           STRING PDF-POSZ " Td (" DELIMITED SIZE INTO PDF-BUFFER
+                  POINTER PDF-IDX
+           STRING PDF-CELL-TXT(1:PDF-ST) ") Tj ET"
+                  DELIMITED SIZE INTO PDF-BUFFER POINTER PDF-IDX
+           IF PDF-COLOR-FLAG = 1
+              STRING " Q" X"0A" DELIMITED SIZE INTO PDF-BUFFER
+                     POINTER PDF-IDX
+           ELSE
+              STRING X"0A" DELIMITED SIZE INTO PDF-BUFFER
+                     POINTER PDF-IDX
+           END-IF
+           IF PDF-FONT-UNDER = "S"
+              MOVE 0 TO PDF-AX3
+              PERFORM VARYING PDF-AX2 FROM 1 BY 1 UNTIL
+                  PDF-AX2 > PDF-ST
+                  IF PDF-CELL-TXT(PDF-AX2:1) = SPACE
+                     ADD 1 TO PDF-AX3
+                  END-IF
+              END-PERFORM
+              MOVE PDF-CELL-TXT TO PDF-STR
+              PERFORM PDF-GET-STR-W
+              COMPUTE PDF-SW = PDF-SW + PDF-WS * PDF-AX3
+              COMPUTE PDF-POS ROUNDED = (PDF-X + PDF-CELL-DX) * PDF-K
+              MOVE PDF-POS TO PDF-POSZ
+              STRING PDF-POSZ " " DELIMITED SIZE INTO PDF-BUFFER
+                     POINTER PDF-IDX
+              COMPUTE PDF-POS ROUNDED = (PDF-PH - ((PDF-Y + 0.5 *
+                 PDF-CELL-H + 0.3 * PDF-FONT-SZ) - PDF-FONT-UP / 1000 *
+                 PDF-FONT-SZ)) * PDF-K
+              MOVE PDF-POS TO PDF-POSZ
+              STRING PDF-POSZ " " DELIMITED SIZE INTO PDF-BUFFER
+                     POINTER PDF-IDX
+              COMPUTE PDF-POS ROUNDED = PDF-SW * PDF-K
+              MOVE PDF-POS TO PDF-POSZ
+              STRING PDF-POSZ " " DELIMITED SIZE INTO PDF-BUFFER
+                     POINTER PDF-IDX
+              COMPUTE PDF-POS ROUNDED = (PDF-FONT-UT / 1000 *
+                                         PDF-FONT-SZPT) * -1
+              MOVE PDF-POS TO PDF-POSZ
+              STRING PDF-POSZ " re f" X"0A" DELIMITED SIZE
+                     INTO PDF-BUFFER POINTER PDF-IDX
+           END-IF
+           IF PDF-CELL-LN POSITIVE
+              ADD PDF-CELL-H TO PDF-Y
+              IF PDF-CELL-LN = 1
+                 MOVE PDF-PAG-LM TO PDF-X
+              END-IF
+           ELSE
+              ADD PDF-CELL-W TO PDF-X
+           END-IF
+           IF PDF-IDX > 1000
+              PERFORM PDF-GRAVA-BUFFER
+           END-IF.
+
+       PDF-GET-STR-W.
+           MOVE 0 TO PDF-SW
+           PERFORM VARYING PDF-ST FROM 800 BY -1 UNTIL PDF-ST < 1 OR
+                   PDF-STR(PDF-ST:1) NOT = SPACE
+           END-PERFORM
+           PERFORM VARYING PDF-AX2 FROM 1 BY 1 UNTIL PDF-AX2 > PDF-ST
+              MOVE FUNCTION ORD(PDF-STR(PDF-AX2:1)) TO PDF-ORD
+              ADD PDF-FW(PDF-ORD) TO PDF-SW
+           END-PERFORM
+           COMPUTE PDF-SW = PDF-SW * PDF-FONT-SZ / 1000.
+
+       PDF-GET-STR-LIN.
+           MOVE 0 TO PDF-SW
+           MOVE 0 TO PDF-SL
+           MOVE 0 TO PDF-AX6
+           PERFORM VARYING PDF-ST FROM 800 BY -1 UNTIL PDF-ST < 1 OR
+                   PDF-STR(PDF-ST:1) NOT = SPACE
+           END-PERFORM
+           PERFORM VARYING PDF-AX2 FROM 1 BY 1 UNTIL PDF-AX2 > PDF-ST
+              MOVE FUNCTION ORD(PDF-STR(PDF-AX2:1)) TO PDF-ORD
+              ADD PDF-FW(PDF-ORD) TO PDF-SW
+              COMPUTE PDF-MULT-SWATU ROUNDED = PDF-SW * PDF-FONT-SZ /
+                                               1000
+              IF PDF-STR(PDF-AX2:1) = " "
+                 IF PDF-MULT-SWATU < PDF-MULT-W
+                    MOVE PDF-AX2 TO PDF-AX6
+                 END-IF
+              END-IF
+              IF PDF-MULT-SWATU >= (PDF-MULT-W - 2 * PDF-PAG-IM)
+                 ADD 1 TO PDF-SL
+                 IF PDF-AX6 > 0
+                    MOVE PDF-AX6 TO PDF-AX2
+                 ELSE
+                    SUBTRACT 1 FROM PDF-AX2
+                 END-IF
+                 MOVE 0 TO PDF-SW PDF-AX6
+              END-IF
+           END-PERFORM
+           ADD 1 TO PDF-SL.
+
+       PDF-SET-FONT.
+           MOVE PDF-FONT-SZPT TO PDF-FONT-SZZ
+           EVALUATE PDF-FONT-NAME
+              WHEN "COURIER"
+                 EVALUATE PDF-FONT-ST
+                    WHEN "N "
+                       MOVE "Courier" TO PDF-FONT-N(5)
+                       MOVE 1           TO PDF-FONT-FLAG(5)
+                       STRING "BT /F5 " PDF-FONT-SZZ " Tf ET" X"0A"
+                              DELIMITED SIZE INTO PDF-BUFFER
+                              POINTER PDF-IDX
+                    WHEN "B "
+                       MOVE "Courier-Bold" TO PDF-FONT-N(6)
+                       MOVE 1                TO PDF-FONT-FLAG(6)
+                       STRING "BT /F6 " PDF-FONT-SZZ " Tf ET" X"0A"
+                              DELIMITED SIZE INTO PDF-BUFFER
+                              POINTER PDF-IDX
+                    WHEN "I "
+                       MOVE "Courier-Oblique" TO PDF-FONT-N(7)
+                       MOVE 1                   TO PDF-FONT-FLAG(7)
+                       STRING "BT /F7 " PDF-FONT-SZZ " Tf ET" X"0A"
+                              DELIMITED SIZE INTO PDF-BUFFER
+                              POINTER PDF-IDX
+                    WHEN "IB"
+                       MOVE "Courier-BoldOblique" TO PDF-FONT-N(8)
+                       MOVE 1                       TO PDF-FONT-FLAG(8)
+                       STRING "BT /F8 " PDF-FONT-SZZ " Tf ET" X"0A"
+                              DELIMITED SIZE INTO PDF-BUFFER
+                              POINTER PDF-IDX
+                 END-EVALUATE
+              WHEN "TIMES"
+                 EVALUATE PDF-FONT-ST
+                    WHEN "N "
+                       MOVE "Times-Roman" TO PDF-FONT-N(9)
+                       MOVE 1           TO PDF-FONT-FLAG(9)
+                       STRING "BT /F9 " PDF-FONT-SZZ " Tf ET" X"0A"
+                              DELIMITED SIZE INTO PDF-BUFFER
+                              POINTER PDF-IDX
+                    WHEN "B "
+                       MOVE "Times-Bold" TO PDF-FONT-N(10)
+                       MOVE 1                TO PDF-FONT-FLAG(10)
+                       STRING "BT /F10 " PDF-FONT-SZZ " Tf ET" X"0A"
+                              DELIMITED SIZE INTO PDF-BUFFER
+                              POINTER PDF-IDX
+                    WHEN "I "
+                       MOVE "Times-Italic" TO PDF-FONT-N(11)
+                       MOVE 1                   TO PDF-FONT-FLAG(11)
+                       STRING "BT /F11 " PDF-FONT-SZZ " Tf ET" X"0A"
+                              DELIMITED SIZE INTO PDF-BUFFER
+                              POINTER PDF-IDX
+                    WHEN "IB"
+                       MOVE "Times-BoldItalic" TO PDF-FONT-N(12)
+                       MOVE 1                       TO PDF-FONT-FLAG(12)
+                       STRING "BT /F12 " PDF-FONT-SZZ " Tf ET" X"0A"
+                              DELIMITED SIZE INTO PDF-BUFFER
+                              POINTER PDF-IDX
+                 END-EVALUATE
+              WHEN OTHER   *>ARIAL
+                 EVALUATE PDF-FONT-ST
+                    WHEN "N "
+                       MOVE "Helvetica" TO PDF-FONT-N(1)
+                       MOVE 1           TO PDF-FONT-FLAG(1)
+                       STRING "BT /F1 " PDF-FONT-SZZ " Tf ET" X"0A"
+                              DELIMITED SIZE INTO PDF-BUFFER
+                              POINTER PDF-IDX
+                    WHEN "B "
+                       MOVE "Helvetica-Bold" TO PDF-FONT-N(2)
+                       MOVE 1                TO PDF-FONT-FLAG(2)
+                       STRING "BT /F2 " PDF-FONT-SZZ " Tf ET" X"0A"
+                              DELIMITED SIZE INTO PDF-BUFFER
+                              POINTER PDF-IDX
+                    WHEN "I "
+                       MOVE "Helvetica-Oblique" TO PDF-FONT-N(3)
+                       MOVE 1                   TO PDF-FONT-FLAG(3)
+                       STRING "BT /F3 " PDF-FONT-SZZ " Tf ET" X"0A"
+                              DELIMITED SIZE INTO PDF-BUFFER
+                              POINTER PDF-IDX
+                    WHEN "IB"
+                       MOVE "Helvetica-BoldOblique" TO PDF-FONT-N(4)
+                       MOVE 1                       TO PDF-FONT-FLAG(4)
+                       STRING "BT /F4 " PDF-FONT-SZZ " Tf ET" X"0A"
+                              DELIMITED SIZE INTO PDF-BUFFER
+                              POINTER PDF-IDX
+                 END-EVALUATE
+           END-EVALUATE
+           COMPUTE PDF-FONT-SZ ROUNDED = PDF-FONT-SZPT / PDF-K
+           COPY LIB/PDFHELV.PRD.
+
+       PDF-ADD-PG.
+           IF PDF-NUM-PAG = 0
+              MOVE 2 TO PDF-ACCESS-MODE
+              MOVE 0 TO PDF-DENY-MODE
+              PERFORM PDF-CRIAR-ARQ
+              MOVE 3 TO PDF-ACCESS-MODE
+              MOVE PDF-FILE-HANDLE TO PDF-HANDLE
+              PERFORM VARYING PDF-AX2 FROM 50 BY -1 UNTIL PDF-AX2 < 1
+                      OR PDF-FILE(PDF-AX2:1) = "." END-PERFORM
+              MOVE ".REF" TO PDF-FILE(PDF-AX2:)
+              PERFORM PDF-CRIAR-ARQ
+              MOVE PDF-FILE-HANDLE TO REF-HANDLE
+              MOVE PDF-HANDLE TO PDF-FILE-HANDLE
+              ACCEPT PDF-DATA-SIS FROM DATE
+              ACCEPT PDF-HORA-SIS FROM TIME
+              STRING "20" PDF-DATA-SIS PDF-HORA-SIS(1:6)
+                     DELIMITED SIZE INTO PDF-DTHR
+              COMPUTE PDF-K ROUNDED = 72 / 25.4
+
+              MOVE 1 TO PDF-IDX
+              MOVE 15 TO PDF-POS-OBJ(3)
+              MOVE 93 TO PDF-POS-OBJ(4)
+              STRING "%PDF-1.3" X"0A" "%âãÏÓ" X"0A" "3 0 obj" X"0A"
+                     "<</Type /Page" X"0A" "/Parent 1 0 R" X"0A"
+                     "/Resources 2 0 R" X"0A" "/Contents 4 0 R>>"
+                     X"0A" "endobj" X"0A" "4 0 obj" X"0A" "<</Length "
+                     DELIMITED SIZE INTO PDF-BUFFER POINTER PDF-IDX
+              COMPUTE PDF-POS-TAM = PDF-IDX - 1
+              STRING "000000>>" X"0A" "stream" X"0A"
+                     DELIMITED SIZE INTO PDF-BUFFER POINTER PDF-IDX
+              COMPUTE PDF-TAM-PG = PDF-IDX - 1
+              STRING "2 J" X"0A" "0.57 w" X"0A"
+                     DELIMITED SIZE INTO PDF-BUFFER POINTER PDF-IDX
+              PERFORM PDF-SET-FONT
+              COMPUTE PDF-TAM-PG = PDF-IDX - 1 - PDF-TAM-PG
+              MOVE 0  TO PDF-FILE-OFFSET
+              COMPUTE PDF-BYTE-COUNT = PDF-IDX - 1
+              PERFORM PDF-GRAVA-ARQ
+              COMPUTE PDF-OFFSET-TOTAL = PDF-OFFSET-TOTAL +
+                                         PDF-BYTE-COUNT
+              MOVE SPACES TO PDF-BUFFER
+              MOVE 1      TO PDF-IDX
+              EVALUATE PDF-PAG-TIPO
+                 WHEN "A4"
+                    IF PDF-PAG-ORI = "L"
+                       MOVE 595.28 TO PDF-PAG-H
+                       MOVE 841.89 TO PDF-PAG-W
+                    ELSE
+                       MOVE 595.28 TO PDF-PAG-W
+                       MOVE 841.89 TO PDF-PAG-H
+                    END-IF
+                 WHEN "A3"
+                    IF PDF-PAG-ORI = "L"
+                       MOVE 841.89  TO PDF-PAG-H
+                       MOVE 1190.55 TO PDF-PAG-W
+                    ELSE
+                       MOVE 841.89  TO PDF-PAG-W
+                       MOVE 1190.55 TO PDF-PAG-H
+                    END-IF
+                 WHEN "A5"
+                    IF PDF-PAG-ORI = "L"
+                       MOVE 420.94  TO PDF-PAG-H
+                       MOVE 595.28 TO PDF-PAG-W
+                    ELSE
+                       MOVE 420.94 TO PDF-PAG-W
+                       MOVE 595.28 TO PDF-PAG-H
+                    END-IF
+                 WHEN "LT"
+                    IF PDF-PAG-ORI = "L"
+                       MOVE 612 TO PDF-PAG-H
+                       MOVE 792 TO PDF-PAG-W
+                    ELSE
+                       MOVE 612 TO PDF-PAG-W
+                       MOVE 792 TO PDF-PAG-H
+                    END-IF
+                 WHEN "LE"
+                    IF PDF-PAG-ORI = "L"
+                       MOVE 612  TO PDF-PAG-H
+                       MOVE 1008 TO PDF-PAG-W
+                    ELSE
+                       MOVE 612  TO PDF-PAG-W
+                       MOVE 1008 TO PDF-PAG-H
+                    END-IF
+                 WHEN OTHER
+                    IF PDF-PAG-ORI = "L"
+                       COMPUTE PDF-PAG-H ROUNDED = PDF-PAG-H * PDF-K
+                       COMPUTE PDF-PAG-W ROUNDED = PDF-PAG-W * PDF-K
+                    ELSE
+                       COMPUTE PDF-PAG-H ROUNDED = PDF-PAG-H * PDF-K
+                       COMPUTE PDF-PAG-W ROUNDED = PDF-PAG-W * PDF-K
+                    END-IF
+              END-EVALUATE
+           ELSE
+              PERFORM PDF-GRAVA-BUFFER
+              MOVE PDF-POS-TAM TO PDF-FILE-OFFSET
+              MOVE 6           TO PDF-BYTE-COUNT
+              STRING PDF-TAM-PG DELIMITED SIZE INTO PDF-BUFFER
+              PERFORM PDF-GRAVA-ARQ
+              MOVE SPACES TO PDF-BUFFER
+              MOVE 1      TO PDF-IDX
+              STRING X"0A" "endstream" X"0A" "endobj" X"0A"
+                     DELIMITED SIZE INTO PDF-BUFFER POINTER PDF-IDX
+              PERFORM VARYING PDF-AX2 FROM 1 BY 1 UNTIL PDF-AX2 > 8
+                      OR PDF-NUM-OBJ(PDF-AX2:1) NOT = "0"
+              END-PERFORM
+
+              COMPUTE PDF-CON-OBJ = PDF-NUM-OBJ + 1
+              PERFORM VARYING PDF-AX3 FROM 1 BY 1 UNTIL PDF-AX3 > 8
+                      OR PDF-CON-OBJ(PDF-AX3:1) NOT = "0"
+              END-PERFORM
+
+              COMPUTE PDF-POS-OBJ(5) = PDF-OFFSET-TOTAL +
+                                       PDF-IDX - 1
+              STRING PDF-POS-OBJ(5) X"0A" DELIMITED SIZE
+                     INTO REF-BUFFER
+              PERFORM PDF-GRAVA-REF
+              ADD 11 TO REF-FILE-OFFSET
+
+              STRING PDF-NUM-OBJ(PDF-AX2:) " 0 obj" X"0A"
+                     "<</Type /Page" X"0A" "/Parent 1 0 R" X"0A"
+                     "/Resources 2 0 R" X"0A" "/Contents "
+                     PDF-CON-OBJ(PDF-AX3:) " 0 R>>" X"0A" "endobj"
+                     X"0A" DELIMITED SIZE INTO PDF-BUFFER
+                     POINTER PDF-IDX
+              COMPUTE PDF-POS-OBJ(5) = PDF-OFFSET-TOTAL +
+                                       PDF-IDX - 1
+              STRING PDF-POS-OBJ(5) X"0A" DELIMITED SIZE
+                     INTO REF-BUFFER
+              PERFORM PDF-GRAVA-REF
+              ADD 11 TO REF-FILE-OFFSET
+              STRING PDF-CON-OBJ(PDF-AX3:) " 0 obj" X"0A"
+                     "<</Length " DELIMITED SIZE INTO PDF-BUFFER
+                     POINTER PDF-IDX
+              COMPUTE PDF-POS-TAM = PDF-OFFSET-TOTAL + PDF-IDX - 1
+              STRING "000000>>" X"0A" "stream" X"0A"
+                     DELIMITED SIZE INTO PDF-BUFFER POINTER PDF-IDX
+              COMPUTE PDF-TAM-PG = PDF-IDX - 1
+              STRING "2 J" X"0A" "0.57 w" X"0A"
+                     DELIMITED SIZE INTO PDF-BUFFER POINTER PDF-IDX
+              PERFORM PDF-SET-FONT
+              IF PDF-DCOLOR(1:7) NOT = "0.000 G"
+                 PERFORM PDF-SET-DRAW-COLOR
+              END-IF
+              IF PDF-FCOLOR(1:7) NOT = "0.000 g"
+                 PERFORM PDF-SET-FILL-COLOR
+              END-IF
+              PERFORM PDF-GRAVA-BUFFER
+              ADD 2 TO PDF-NUM-OBJ
+              COMPUTE PDF-TAM-PG = PDF-OFFSET-TOTAL - PDF-POS-TAM - 16
+           END-IF
+           COMPUTE PDF-PW ROUNDED = (PDF-PAG-W / PDF-K)
+           COMPUTE PDF-PH ROUNDED = (PDF-PAG-H / PDF-K)
+           MOVE PDF-PAG-LM TO PDF-X
+           MOVE PDF-PAG-TM TO PDF-Y
+           ADD 1 TO PDF-NUM-PAG
+           MOVE PDF-CELL TO PDF-GCELL
+           PERFORM PDF-CABEC
+           MOVE PDF-GCELL TO PDF-CELL.
+
+       PDF-SET-FILL-COLOR.
+           IF PDF-FILL-R = PDF-FILL-G AND PDF-FILL-R = PDF-FILL-B
+              COMPUTE PDF-FILL-POSZ ROUNDED = PDF-FILL-R / 255
+              STRING PDF-FILL-POSZ " g" DELIMITED SIZE
+                     INTO PDF-FCOLOR
+           ELSE
+              MOVE 1 TO PDF-AX4
+              COMPUTE PDF-FILL-POSZ ROUNDED = PDF-FILL-R / 255
+              STRING PDF-FILL-POSZ " " DELIMITED SIZE
+                     INTO PDF-FCOLOR POINTER PDF-AX4
+              COMPUTE PDF-FILL-POSZ ROUNDED = PDF-FILL-G / 255
+              STRING PDF-FILL-POSZ " " DELIMITED SIZE
+                     INTO PDF-FCOLOR POINTER PDF-AX4
+              COMPUTE PDF-FILL-POSZ ROUNDED = PDF-FILL-B / 255
+              STRING PDF-FILL-POSZ " rg" DELIMITED SIZE
+                     INTO PDF-FCOLOR POINTER PDF-AX4
+           END-IF
+           PERFORM VARYING PDF-AX2 FROM 30 BY -1 UNTIL PDF-AX2 < 1
+                   OR PDF-FCOLOR(PDF-AX2:1) NOT = SPACE END-PERFORM
+           STRING PDF-FCOLOR(1:PDF-AX2) X"0A" DELIMITED SIZE
+                  INTO PDF-BUFFER POINTER PDF-IDX
+           IF PDF-FCOLOR = PDF-TCOLOR
+              MOVE 0 TO PDF-COLOR-FLAG
+           ELSE
+              MOVE 1 TO PDF-COLOR-FLAG
+           END-IF.
+
+       PDF-SET-TEXT-COLOR.
+           IF PDF-TEXT-R = PDF-TEXT-G AND PDF-TEXT-R = PDF-TEXT-B
+              COMPUTE PDF-TEXT-POSZ ROUNDED = PDF-TEXT-R / 255
+              STRING PDF-TEXT-POSZ " g" X"0A" DELIMITED SIZE
+                     INTO PDF-TCOLOR
+           ELSE
+              MOVE 1 TO PDF-AX4
+              COMPUTE PDF-TEXT-POSZ ROUNDED = PDF-TEXT-R / 255
+              STRING PDF-TEXT-POSZ " " DELIMITED SIZE
+                     INTO PDF-TCOLOR POINTER PDF-AX4
+              COMPUTE PDF-TEXT-POSZ ROUNDED = PDF-TEXT-G / 255
+              STRING PDF-TEXT-POSZ " " DELIMITED SIZE
+                     INTO PDF-TCOLOR POINTER PDF-AX4
+              COMPUTE PDF-TEXT-POSZ ROUNDED = PDF-TEXT-B / 255
+              STRING PDF-TEXT-POSZ " rg" DELIMITED SIZE
+                     INTO PDF-TCOLOR POINTER PDF-AX4
+           END-IF
+           IF PDF-FCOLOR = PDF-TCOLOR
+              MOVE 0 TO PDF-COLOR-FLAG
+           ELSE
+              MOVE 1 TO PDF-COLOR-FLAG
+           END-IF.
+
+       PDF-SET-DRAW-COLOR.
+           IF PDF-DRAW-R = PDF-DRAW-G AND PDF-DRAW-R = PDF-DRAW-B
+              COMPUTE PDF-DRAW-POSZ ROUNDED = PDF-DRAW-R / 255
+              STRING PDF-DRAW-POSZ " G" DELIMITED SIZE
+                     INTO PDF-DCOLOR
+           ELSE
+              MOVE 1 TO PDF-AX4
+              COMPUTE PDF-DRAW-POSZ ROUNDED = PDF-DRAW-R / 255
+              STRING PDF-DRAW-POSZ " " DELIMITED SIZE
+                     INTO PDF-DCOLOR POINTER PDF-AX4
+              COMPUTE PDF-DRAW-POSZ ROUNDED = PDF-DRAW-G / 255
+              STRING PDF-DRAW-POSZ " " DELIMITED SIZE
+                     INTO PDF-DCOLOR POINTER PDF-AX4
+              COMPUTE PDF-DRAW-POSZ ROUNDED = PDF-DRAW-B / 255
+              STRING PDF-DRAW-POSZ " RG" DELIMITED SIZE
+                     INTO PDF-DCOLOR POINTER PDF-AX4
+           END-IF
+           PERFORM VARYING PDF-AX2 FROM 30 BY -1 UNTIL PDF-AX2 < 1
+                   OR PDF-DCOLOR(PDF-AX2:1) NOT = SPACE END-PERFORM
+           STRING PDF-DCOLOR(1:PDF-AX2) X"0A" DELIMITED SIZE
+                  INTO PDF-BUFFER POINTER PDF-IDX.
+
+       PDF-ROT-TEXT.
+           COMPUTE PDF-ROT-COS ROUNDED = FUNCTION COS(PDF-ROT-ANG *
+                                         PDF-PI / 180)
+           COMPUTE PDF-ROT-SIN ROUNDED = FUNCTION SIN(PDF-ROT-ANG *
+                                         PDF-PI / 180)
+           MOVE PDF-ROT-COS TO PDF-ROT-POS
+           STRING "q " PDF-ROT-POS " " DELIMITED SIZE INTO PDF-BUFFER
+                  POINTER PDF-IDX
+           MOVE PDF-ROT-SIN TO PDF-ROT-POS
+           STRING PDF-ROT-POS " " DELIMITED SIZE INTO PDF-BUFFER
+                  POINTER PDF-IDX
+           COMPUTE PDF-ROT-SIN = PDF-ROT-SIN * -1
+           MOVE PDF-ROT-SIN TO PDF-ROT-POS
+           STRING PDF-ROT-POS " " DELIMITED SIZE INTO PDF-BUFFER
+                  POINTER PDF-IDX
+           MOVE PDF-ROT-COS TO PDF-ROT-POS
+           STRING PDF-ROT-POS " " DELIMITED SIZE INTO PDF-BUFFER
+                  POINTER PDF-IDX
+           COMPUTE PDF-ROT-X ROUNDED = PDF-ROT-X * PDF-K
+           MOVE PDF-ROT-X TO PDF-ROT-POSXY
+           STRING PDF-ROT-POSXY " " DELIMITED SIZE INTO PDF-BUFFER
+                  POINTER PDF-IDX
+           COMPUTE PDF-ROT-Y ROUNDED = (PDF-PH - PDF-ROT-Y) * PDF-K
+           MOVE PDF-ROT-Y TO PDF-ROT-POSXY
+           STRING PDF-ROT-POSXY " cm 1 0 0 1 " DELIMITED SIZE
+                  INTO PDF-BUFFER POINTER PDF-IDX
+           COMPUTE PDF-ROT-X = PDF-ROT-X * -1
+           MOVE PDF-ROT-X TO PDF-ROT-POSXY
+           STRING PDF-ROT-POSXY " " DELIMITED SIZE INTO PDF-BUFFER
+                  POINTER PDF-IDX
+           COMPUTE PDF-ROT-Y = PDF-ROT-Y * -1
+           MOVE PDF-ROT-Y TO PDF-ROT-POSXY
+           STRING PDF-ROT-POSXY " cm" X"0A" DELIMITED SIZE
+                  INTO PDF-BUFFER POINTER PDF-IDX
+           COMPUTE PDF-ROT-X = PDF-ROT-X * -1
+           MOVE PDF-ROT-X TO PDF-ROT-POSXY
+           IF PDF-COLOR-FLAG = 1
+              PERFORM VARYING PDF-AX2 FROM 30 BY -1 UNTIL PDF-AX2 < 1
+                     OR PDF-TCOLOR(PDF-AX2:1) NOT = SPACE END-PERFORM
+              STRING PDF-TCOLOR(1:PDF-AX2) " " DELIMITED SIZE
+                     INTO PDF-BUFFER POINTER PDF-IDX
+           END-IF
+           STRING "BT " PDF-ROT-POSXY " " DELIMITED SIZE
+                  INTO PDF-BUFFER POINTER PDF-IDX
+           COMPUTE PDF-ROT-Y = PDF-ROT-Y * -1
+           MOVE PDF-ROT-Y TO PDF-ROT-POSXY
+           STRING PDF-ROT-POSXY " Td (" DELIMITED SIZE PDF-ROT-TXT
+                  DELIMITED "  " ") Tj ET Q" X"0A" DELIMITED SIZE
+                  INTO PDF-BUFFER POINTER PDF-IDX.
+
+       PDF-RECT.
+           COMPUTE PDF-RECT-X ROUNDED = PDF-RECT-X * PDF-K
+           MOVE PDF-RECT-X TO PDF-RECT-POSXY
+           STRING PDF-RECT-POSXY " " DELIMITED SIZE INTO PDF-BUFFER
+                  POINTER PDF-IDX
+           COMPUTE PDF-RECT-Y ROUNDED = (PDF-PH - PDF-RECT-Y) * PDF-K
+           MOVE PDF-RECT-Y TO PDF-RECT-POSXY
+           STRING PDF-RECT-POSXY " " DELIMITED SIZE
+                  INTO PDF-BUFFER POINTER PDF-IDX
+           COMPUTE PDF-RECT-W ROUNDED = PDF-RECT-W * PDF-K
+           MOVE PDF-RECT-W TO PDF-RECT-POSXY
+           STRING PDF-RECT-POSXY " " DELIMITED SIZE INTO PDF-BUFFER
+                  POINTER PDF-IDX
+           COMPUTE PDF-RECT-H ROUNDED = PDF-RECT-H * PDF-K * -1
+           MOVE PDF-RECT-H TO PDF-RECT-POSXY
+           STRING PDF-RECT-POSXY " re "
+                  PDF-RECT-STYLE X"0A" DELIMITED SIZE
+                  INTO PDF-BUFFER POINTER PDF-IDX.
+
+       PDF-GRAVA-BUFFER.
+           MOVE PDF-OFFSET-TOTAL TO PDF-FILE-OFFSET
+           SUBTRACT 1 FROM PDF-IDX
+           COMPUTE PDF-TAM-PG = PDF-TAM-PG + PDF-IDX
+           MOVE PDF-IDX TO PDF-BYTE-COUNT
+           COMPUTE PDF-OFFSET-TOTAL = PDF-OFFSET-TOTAL +
+                   PDF-BYTE-COUNT
+           PERFORM PDF-GRAVA-ARQ
+           MOVE SPACES TO PDF-BUFFER
+           MOVE 1 TO PDF-IDX.
+
+       PDF-INI-VARS.
+           INITIALIZE PDF-VAR
+           MOVE 3.1415926535898 TO PDF-PI
+           MOVE -100      TO PDF-FONT-UP
+           MOVE 50        TO PDF-FONT-UT
+           MOVE 5         TO PDF-NUM-OBJ
+           INITIALIZE PDF-PAGINA
+           MOVE "A4"      TO PDF-PAG-TIPO
+           MOVE 595.28    TO PDF-PAG-W
+           MOVE 841.89    TO PDF-PAG-H
+           MOVE "P"       TO PDF-PAG-ORI
+           MOVE 10.00     TO PDF-PAG-LM PDF-PAG-RM PDF-PAG-TM PDF-PAG-BM
+           MOVE 1         TO PDF-PAG-IM
+           INITIALIZE PDF-FONTES
+           MOVE 10        TO PDF-FONT-SZPT
+           MOVE "N"       TO PDF-FONT-ST
+           MOVE "ARIAL"   TO PDF-FONT-NAME
+           MOVE "F1"      TO PDF-FONT-F
+           INITIALIZE PDF-TAB-FONT
+           INITIALIZE PDF-FILL-COLOR
+           MOVE 189       TO PDF-FILL-R
+           MOVE 189       TO PDF-FILL-G
+           MOVE 189       TO PDF-FILL-B
+           MOVE "0.000 g" TO PDF-FCOLOR
+           INITIALIZE PDF-TEXT-COLOR
+           MOVE "0.000 g" TO PDF-TCOLOR
+           INITIALIZE PDF-DRAW-COLOR
+           MOVE "0.000 G" TO PDF-DCOLOR
+           INITIALIZE PDF-CELULA
+           INITIALIZE PDF-GCELL
+           INITIALIZE PDF-MULTI-CELULA
+           MOVE "|"       TO PDF-MULT-CQ
+           INITIALIZE PDF-ROTACIONA
+           INITIALIZE PDF-RECTANG
+           INITIALIZE PDF-CODBAR-EAN13.
+
+       PDF-LOAD-EAN13.
+           STRING
+              "00011010011001001001101111010100011"
+              "01100010101111011101101101110001011"
+              "01001110110011001101101000010011101"
+              "01110010000101001000100010010010111"
+              "11100101100110110110010000101011100"
+              "10011101010000100010010010001110100"
+           DELIMITED SIZE INTO PDF-CODES-SET
+           STRING
+              "111111"
+              "112122"
+              "112212"
+              "112221"
+              "121122"
+              "122112"
+              "122211"
+              "121212"
+              "121221"
+              "122121"
+           DELIMITED SIZE INTO PDF-PARES-SET.
+
+       PDF-CRIAR-ARQ.
+           CALL "CBL_CREATE_FILE" USING PDF-FILE
+                                        PDF-ACCESS-MODE
+                                        PDF-DENY-MODE
+                                        PDF-DEVICE
+                                        PDF-FILE-HANDLE.
+       PDF-ABRIR-ARQ.
+           CALL "CBL_OPEN_FILE" USING PDF-FILE
+                                      PDF-ACCESS-MODE
+                                      PDF-DENY-MODE
+                                      PDF-DEVICE
+                                      PDF-FILE-HANDLE.
+       PDF-LER-ARQ.
+           CALL "CBL_READ_FILE" USING PDF-FILE-HANDLE
+                                      PDF-FILE-OFFSET
+                                      PDF-BYTE-COUNT
+                                      PDF-FLAGS
+                                      PDF-BUFFER.
+       PDF-LER-REF.
+           CALL "CBL_READ_FILE" USING REF-HANDLE
+                                      REF-FILE-OFFSET
+                                      REF-BYTE-COUNT
+                                      REF-FLAGS
+                                      REF-BUFFER.
+       PDF-GRAVA-ARQ.
+           CALL "CBL_WRITE_FILE" USING PDF-FILE-HANDLE
+                                       PDF-FILE-OFFSET
+                                       PDF-BYTE-COUNT
+                                       PDF-FLAGS
+                                       PDF-BUFFER.
+       PDF-GRAVA-REF.
+           CALL "CBL_WRITE_FILE" USING REF-HANDLE
+                                       REF-FILE-OFFSET
+                                       REF-BYTE-COUNT
+                                       REF-FLAGS
+                                       REF-BUFFER.
+       PDF-APAGA-REF.
+           CALL "CBL_DELETE_FILE" USING PDF-FILE.
+
+       PDF-FECHA-ARQ.
+           CALL "CBL_FLUSH_FILE" USING PDF-FILE-HANDLE.
+           CALL "CBL_CLOSE_FILE" USING PDF-FILE-HANDLE.
