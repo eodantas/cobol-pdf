@@ -14,7 +14,7 @@ See sample.cob and the manual in doc folder.
 
 ## Authors
 
-* [Edgar Olavo Garcia Dantas](eodantas@gmail.com)
+* [Edgar Olavo Garcia Dantas (eodantas@gmail.com)](https://github.com/eodantas)
 
 ## License
 
