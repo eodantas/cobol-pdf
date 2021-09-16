@@ -218,7 +218,7 @@
            PERFORM VARYING PDF-AX2 FROM 20 BY -1 UNTIL PDF-AX2 < 1 OR
                    PDF-INFO(PDF-AX2:1) NOT = SPACE END-PERFORM
            PERFORM VARYING PDF-AX3 FROM 1 BY 1 UNTIL PDF-AX3 > 10 OR
-                   PDF-POS-OBJ(5)(PDF-AX3:1) NOT = "0"
+                   PDF-POS-OBJ(5)(PDF-AX3:1) NOT = "0" END-PERFORM
            STRING PDF-INFO(1:PDF-AX2) X"0A" ">>" X"0A" "startxref"
                   X"0A" PDF-POS-OBJ(5)(PDF-AX3:) X"0A" "%%EOF"
                   DELIMITED SIZE INTO PDF-BUFFER POINTER PDF-IDX
@@ -705,7 +705,7 @@
               MOVE 1 TO PDF-IDX
               MOVE 15 TO PDF-POS-OBJ(3)
               MOVE 93 TO PDF-POS-OBJ(4)
-              STRING "%PDF-1.3" X"0A" "%‚„œ”" X"0A" "3 0 obj" X"0A"
+              STRING "%PDF-1.3" X"0A" "%√¢√£√è√ì" X"0A" "3 0 obj" X"0A"
                      "<</Type /Page" X"0A" "/Parent 1 0 R" X"0A"
                      "/Resources 2 0 R" X"0A" "/Contents 4 0 R>>"
                      X"0A" "endobj" X"0A" "4 0 obj" X"0A" "<</Length "
